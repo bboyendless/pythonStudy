@@ -55,7 +55,8 @@ def get_time(url):
     else:
         print("请求失败，状态码为：", response.status_code)
 ```
-**在python中，def代表定义一个方法，def get_time(url)，代表这个方法名叫get_time，输入参数url，冒号后面代表这个方法的代码，如果有return，就代表该方法有返回，返回是return后的内容**
+**在python中，def代表定义一个方法，def get_time(url)，代表这个方法名叫get_time，输入参数url，冒号后面代表这个方法的代码，
+如果有return，就代表该方法有返回，返回是return后的内容**
 
 这样这段代码就有了一个出入口，输入url，输出这个url的请求结果。
 
@@ -86,7 +87,8 @@ if __name__ == "__main__":
 ```
 
 实操部分：
-clone代码到本地，在02_requests_with_params.py中，为urls新增一个字典对应键值："qq": "http://vv.video.qq.com/checktime?otype=json"，
+clone代码到本地，在02_requests_with_params.py中，为urls新增一个字典对应键值：
+"qq": "http://vv.video.qq.com/checktime?otype=json"，
 并在 `if __name__ == "__main__"` 中调用它
 
 # 第三课——处理接口响应数据
@@ -96,8 +98,101 @@ clone代码到本地，在02_requests_with_params.py中，为urls新增一个字
 
 JSON数据解析：学习如何解析接口响应中的JSON数据。介绍常用的JSON解析库，例如json模块、requests库的json()方法以及其他第三方库。
 
-响应状态码处理：了解常见的HTTP响应状态码，并学习如何根据状态码进行不同的处理逻辑，例如200表示成功，400表示请求错误，500表示服务器错误等。
+1. 响应状态码处理：描述接口的响应是什么状态的代码
 
-响应头处理：学习如何获取和解析接口响应中的响应头信息，例如Content-Type、Content-Length等。
+   **常见响应状态码**：
 
-数据提取和断言：探讨如何从接口响应的JSON数据中提取所需的字段和值，以及如何使用断言进行结果的验证和校验。
+| 状态码 | 描述                      |
+|-----|-------------------------|
+| 1** | 信息，服务器收到请求，需要请求者继续执行操作  |
+| 2** | 成功，操作被成功接收并处理           |
+| 3** | 重定向，需要进一步的操作以完成请求       |
+| 4** | 客户端错误，请求包含语法错误或无法完成请求   |
+| 5** | 服务器错误，服务器在处理请求的过程中发生了错误 |
+
+python 中，常见判断响应状态码是否为 200的方法：
+
+```  python     
+   if response.status_code == 200:
+    # 响应成功处理逻辑
+    ...
+
+```
+
+2. 数据提取和断言：如何从接口响应的JSON数据中提取所需的字段和值，以及如何使用断言进行结果的验证和校验。
+
+* 使用json模块：使用json模块的loads()函数将JSON字符串解析为Python对象，然后通过字典键值的方式提取所需字段和值。
+ 例如上节课我们已经知道 taobao 返回的格式是：
+`{'api': 'mtop.common.getTimestamp', 'v': '*', 'ret': ['SUCCESS::接口调用成功'], 'data': {'t': '1688546655186'}}`
+那么上节课的打印方式就可以改为：
+
+```python
+def get_time_by_url(urls):
+    for key, value in urls.items():
+        print(f"正在请求 {key} 的时间...")
+        data_raw = get_time(value)
+        if key == "taobao":
+           # 提取字段和值，在 data.t层级下
+           time = data_raw['data']['t']
+           print("提取出的时间： " + time)
+        print_time(data_raw)
+```
+
+* 使用requests库的json()方法：requests库提供了方便的json()方法，它将响应的JSON数据解析为Python对象。
+应用到我们的 case 中也是类似的方法，不再赘述
+```python
+# 将响应的JSON数据解析为Python对象
+response_data = response.json()
+
+# 提取字段和值
+field_value = response_data['field']
+```
+* 使用第三方库：除了上述方法，还有一些第三方库如pyjq、jq等，可以根据需求选择合适的库进行数据提取。
+
+## 时机已经基本成熟了，我们来为这个接口写个简单的验证：
+我们先把对 状态码 的校验提取出来，如果状态码不为 200，则直接返回 response 内容，看看问题出在哪 ：
+```python
+def get_res_json(url):
+    response = requests.get(url=url)
+    if response.status_code == 200:
+        print("响应状态码为 200")
+        return response.json()  # 解析响应数据为JSON格式
+    else:
+        # 如果响应不正确，那么抛出响应内容
+        print("响应码不为 200，请检查：" + response.text)
+        return None
+```
+再对实际的接口请求方法进行判断
+```python
+def get_time_by_url(urls):
+    for key, value in urls.items():
+        print(f"正在请求 {key} 的时间...")
+        data_raw = get_res_json(value)
+        if key == "taobao":
+            # 提取字段和值，在 data.t层级下
+            timestamp = data_raw['data']['t']
+            # 如果 timestamp 不为空
+            if timestamp:
+                # 格式化一下时间，使其更可读
+                formatted_time = datetime.fromtimestamp(int(timestamp) / 1000).strftime("%Y-%m-%d %H:%M:%S")
+                print("接口内容判断成功，提取出的时间： " + formatted_time)
+        print("接口验证通过")
+```
+运行的结果如下：
+```angular2html
+正在请求 suning 的时间...
+响应状态码为 200
+接口验证通过
+正在请求 taobao 的时间...
+响应状态码为 200
+接口内容判断成功，提取出的时间： 2023-07-05 17:35:27
+接口验证通过
+```
+总结：我们目前有两个接口，我们对其中一个名为 taobao 的接口做了相对完善的接口自动化用例判断
+1. 我们抽取出了公共的用来判断接口状态码的get_res_json模块，状态码正确就返回json 格式的 res，错误就直接返回 res
+2. 如果判断是 taobao 的接口，我们就对接口返回的内容进一步提取，判断时间是否为空
+3. 打印内容，判断接口是否成功
+
+实操：为 suning 接口编写自动化用例判断，要求：判断返回内容 sysTime1和sysTime2 是否相等, 返回内容：
+`{'sysTime2': '2023-07-05 17:43:20', 'sysTime1': '20230705174320'}
+`
